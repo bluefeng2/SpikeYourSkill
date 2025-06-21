@@ -23,7 +23,7 @@ body_joints = {
 data = []
 
 # Open video file (replace 'your_video.mp4' with your video file path)
-cap = cv2.VideoCapture('media\\donny.mp4')
+cap = cv2.VideoCapture('dataAnalysis\\media\\donny.mp4')
 
 def calc_angle(a, b, c):
     a = np.array(a)
@@ -71,6 +71,24 @@ while cap.isOpened():
         if all(j in joint_positions for j in ["Right Hip", "Right Knee", "Right Ankle"]):
             angle = calc_angle(joint_positions["Right Hip"], joint_positions["Right Knee"], joint_positions["Right Ankle"])
             cv2.putText(frame, f"R Leg: {angle:.1f}", joint_positions["Right Knee"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+
+        # Calculate and display angles for hips and shoulders
+        # Hip angle: Left Shoulder - Left Hip - Right Hip
+        if all(j in joint_positions for j in ["Left Shoulder", "Left Hip", "Right Hip"]):
+            angle = calc_angle(joint_positions["Left Shoulder"], joint_positions["Left Hip"], joint_positions["Right Hip"])
+            cv2.putText(frame, f"L Hip: {angle:.1f}", joint_positions["Left Hip"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        # Hip angle: Right Shoulder - Right Hip - Left Hip
+        if all(j in joint_positions for j in ["Right Shoulder", "Right Hip", "Left Hip"]):
+            angle = calc_angle(joint_positions["Right Shoulder"], joint_positions["Right Hip"], joint_positions["Left Hip"])
+            cv2.putText(frame, f"R Hip: {angle:.1f}", joint_positions["Right Hip"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        # Shoulder angle: Left Elbow - Left Shoulder - Right Shoulder
+        if all(j in joint_positions for j in ["Left Elbow", "Left Shoulder", "Right Shoulder"]):
+            angle = calc_angle(joint_positions["Left Elbow"], joint_positions["Left Shoulder"], joint_positions["Right Shoulder"])
+            cv2.putText(frame, f"L Shoulder: {angle:.1f}", joint_positions["Left Shoulder"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+        # Shoulder angle: Right Elbow - Right Shoulder - Left Shoulder
+        if all(j in joint_positions for j in ["Right Elbow", "Right Shoulder", "Left Shoulder"]):
+            angle = calc_angle(joint_positions["Right Elbow"], joint_positions["Right Shoulder"], joint_positions["Left Shoulder"])
+            cv2.putText(frame, f"R Shoulder: {angle:.1f}", joint_positions["Right Shoulder"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
 
     # Draw hand landmarks (fingers)
     if hand_results.multi_hand_landmarks:
