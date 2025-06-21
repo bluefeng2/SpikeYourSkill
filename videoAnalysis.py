@@ -23,7 +23,7 @@ body_joints = {
 data = []
 
 # Open video file (replace 'your_video.mp4' with your video file path)
-cap = cv2.VideoCapture('your_video.mp4')
+cap = cv2.VideoCapture('media\\donny.mp4')
 
 def calc_angle(a, b, c):
     a = np.array(a)
@@ -44,6 +44,8 @@ while cap.isOpened():
     results = pose.process(image_rgb)
     hand_results = hands.process(image_rgb)
 
+    row = [cap.get(cv2.CAP_PROP_POS_MSEC)]  # Timestamp in milliseconds
+
     if results.pose_landmarks:
         h, w, _ = frame.shape
         joint_positions = {}
@@ -53,6 +55,8 @@ while cap.isOpened():
             joint_positions[name] = (x, y)
             cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
             cv2.putText(frame, name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            
+            row.extend([lm.x, lm.y, lm.z])  # Normalized coordinates
 
         # Calculate and display angles for arms and legs
         if all(j in joint_positions for j in ["Left Shoulder", "Left Elbow", "Left Wrist"]):
@@ -76,19 +80,12 @@ while cap.isOpened():
                 x, y = int(lm.x * w), int(lm.y * h)
                 cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
                 cv2.putText(frame, f"F{i}", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                
+                row.extend([lm.x, lm.y, lm.z])  # Normalized coordinates of hand landmarks
             mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
-    # Collect data for analysis
-    if results.pose_landmarks:
-        row = [cap.get(cv2.CAP_PROP_POS_MSEC)]  # Timestamp in milliseconds
-        for idx in body_joints.keys():
-            lm = results.pose_landmarks.landmark[idx]
-            row.extend([lm.x, lm.y, lm.z])  # Normalized coordinates
-        if hand_results.multi_hand_landmarks:
-            for hand_landmarks in hand_results.multi_hand_landmarks:
-                for lm in hand_landmarks.landmark:
-                    row.extend([lm.x, lm.y, lm.z])  # Normalized coordinates of hand landmarks
-        data.append(row)
+    # Append the row to data   
+    data.append(row)
     
     # Display the frame with pose and hand landmarks
     cv2.imshow('Pose Detection', frame)
@@ -97,6 +94,8 @@ while cap.isOpened():
 
 cap.release()
 cv2.destroyAllWindows()
+
+print(data)
 
 with open("analysis.csv", mode="w", newline="") as file:
     writer = csv.writer(file)
