@@ -735,3 +735,36 @@ Conclude with a high-level summary of the most pronounced differences.
 Keep the language direct and avoid conversational filler."'''
 )
 print(response.text)
+
+def plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv, output_dir="outputcsv/angle_graphs"):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import os
+
+    donny_df = pd.read_csv(donny_angles_csv)
+    test_df = pd.read_csv(test_angles_csv)
+
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get joint columns (skip timestamp)
+    joint_columns = [col for col in donny_df.columns if col != "timestamp_milis"]
+
+    for joint in joint_columns:
+        plt.figure(figsize=(12, 5))
+        plt.plot(donny_df[joint], label="Pro", color="blue")
+        plt.plot(test_df[joint], label="Test", color="red")
+        plt.title(f"{joint} Angle Comparison")
+        plt.xlabel("Frame")
+        plt.ylabel("Angle (degrees)")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f"{joint.replace(' ', '_')}_comparison.png"))
+        plt.close()
+    print(f"Saved angle comparison graphs to {output_dir}")
+
+# Example usage:
+plot_and_save_angle_comparisons(
+    "dataAnalysis\\media\\donny_1_angles.csv",
+    "dataAnalysis\\media\\test_angles.csv"
+)
