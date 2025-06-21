@@ -105,10 +105,10 @@ def process_video(filePath):
 
 # Process all videos
 video_files = [
-    "dataAnalysis\\media\\donny_1.mp4",
-    "dataAnalysis\\media\\donny_2.mp4",
-    "dataAnalysis\\media\\donny_3.mp4",
-    "dataAnalysis\\media\\test.mp4"
+    os.path.join("Script", "dataAnalysis", "media", "donny_1.mp4"),
+    os.path.join("Script", "dataAnalysis", "media", "donny_2.mp4"),
+    os.path.join("Script", "dataAnalysis", "media", "donny_3.mp4"),
+    os.path.join("Script", "dataAnalysis", "media", "test.mp4")
 ]
 for file in video_files:
     print(f"Processing {file}...")
@@ -119,11 +119,11 @@ for file in video_files:
 
 # Load CSVs
 proPaths = [
-    "dataAnalysis\\media\\donny_1_angles.csv",
-    "dataAnalysis\\media\\donny_2_angles.csv",
-    "dataAnalysis\\media\\donny_3_angles.csv"
+    os.path.join("Script", "dataAnalysis", "media", "donny_1_angles.csv"),
+    os.path.join("Script", "dataAnalysis", "media", "donny_2_angles.csv"),
+    os.path.join("Script", "dataAnalysis", "media", "donny_3_angles.csv")
 ]
-testPath = "dataAnalysis\\media\\test_angles.csv"
+testPath = os.path.join("Script", "dataAnalysis", "media", "test_angles.csv")
 proCSVS = [pd.read_csv(proPath) for proPath in proPaths]
 testCSV = pd.read_csv(testPath)
 
@@ -198,12 +198,12 @@ for stage, aligned_indices in stages.items():
     test_indices = [test_mapping[i] for i in aligned_indices if i < len(test_mapping)]
     stage_to_test_frames[stage] = test_indices
 
-with open("outputcsv/test_stage_frame_indices.json", "w") as f:
+with open("Script\\outputcsv/test_stage_frame_indices.json", "w") as f:
     json.dump(stage_to_test_frames, f, indent=2)
 
 # ----------- PART 3: Overlay Stage Videos -----------
 
-os.makedirs("outputcsv/test_stages_overlay", exist_ok=True)
+os.makedirs("Script\\outputcsv\\test_stages_overlay", exist_ok=True)
 
 POSE_CONNECTIONS = [
     (11, 13), (13, 15),  # Left arm
@@ -216,11 +216,11 @@ POSE_CONNECTIONS = [
 ]
 
 # Load joint coordinates for test and Donny_1
-test_df = pd.read_csv("dataAnalysis\\media\\test_coords.csv")
-donny_df = pd.read_csv("dataAnalysis\\media\\donny_1_coords.csv")
+test_df = pd.read_csv("Script/dataAnalysis\\media\\test_coords.csv")
+donny_df = pd.read_csv("Script/dataAnalysis\\media\\donny_1_coords.csv")
 
 # Open the source test video
-video_path = 'dataAnalysis\\media\\test.mp4'
+video_path = 'Script/dataAnalysis\\media\\test.mp4'
 cap = cv2.VideoCapture(video_path)
 fps = cap.get(cv2.CAP_PROP_FPS)
 width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -329,7 +329,7 @@ POSE_CONNECTIONS = [
     (11, 23), (12, 24),  # Torso sides
 ]
 
-output_path = "outputcsv/test_wireframe_duo_full.mp4"
+output_path = "Script/outputcsv/test_wireframe_duo_full.mp4"
 cap = cv2.VideoCapture(video_path)
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -693,15 +693,15 @@ def compare_angles_and_report(donny_angles_csv, test_angles_csv, threshold_degre
         values.append(f"Frame {tm['frame']} | Donny time: {tm['donny_time']} | Test time: {tm['test_time']} | Diff: {tm['time_difference_ms']} ms")
     
     # Optionally, save to CSV
-    pd.DataFrame(differences).to_csv("outputcsv/angle_differences_over_30deg.csv", index=False)
-    pd.DataFrame(timing_mismatches).to_csv("outputcsv/timing_mismatches_over_100ms.csv", index=False)
-    print("\nSaved detailed difference reports to outputcsv/angle_differences_over_30deg.csv and outputcsv/timing_mismatches_over_100ms.csv")
+    pd.DataFrame(differences).to_csv("Script/outputcsv/angle_differences_over_30deg.csv", index=False)
+    pd.DataFrame(timing_mismatches).to_csv("Script/outputcsv/timing_mismatches_over_100ms.csv", index=False)
+    print("\nSaved detailed difference reports to Script/outputcsv/angle_differences_over_30deg.csv and Script/outputcsv/timing_mismatches_over_100ms.csv")
 
     return values
 # Example usage:
 outputtext = compare_angles_and_report(
-    "dataAnalysis\\media\\donny_1_angles.csv",
-    "dataAnalysis\\media\\test_angles.csv",
+    "Script/dataAnalysis\\media\\donny_1_angles.csv",
+    "Script/dataAnalysis\\media\\test_angles.csv",
     threshold_degrees=30
 )
 
@@ -736,7 +736,7 @@ Keep the language direct and avoid conversational filler."'''
 )
 print(response.text)
 
-def plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv, output_dir="outputcsv/angle_graphs"):
+def plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv, output_dir="Script/outputcsv/angle_graphs"):
     import pandas as pd
     import matplotlib.pyplot as plt
     import os
@@ -764,7 +764,9 @@ def plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv, output_di
     print(f"Saved angle comparison graphs to {output_dir}")
 
 # Example usage:
-plot_and_save_angle_comparisons(
-    "dataAnalysis\\media\\donny_1_angles.csv",
-    "dataAnalysis\\media\\test_angles.csv"
-)
+donny_angles_csv = os.path.join("Script", "dataAnalysis", "media", "donny_1_angles.csv")
+test_angles_csv = os.path.join("Script", "dataAnalysis", "media", "test_angles.csv")
+
+# Use these variables everywhere you reference the files:
+plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv)
+outputtext = compare_angles_and_report(donny_angles_csv, test_angles_csv, threshold_degrees=30)
