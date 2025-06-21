@@ -705,37 +705,6 @@ outputtext = compare_angles_and_report(
     threshold_degrees=30
 )
 
-from google import genai
-
-client = genai.Client(api_key="AIzaSyC3M6h-GS102ruxezI6dGcLYYLdVM7aXZ0")
-
-outputtext = "\n".join(outputtext)
-response = client.models.generate_content(
-    model="gemini-2.5-flash", contents=f'''"Analyze the following stream of biomechanical data. Each line represents a single frame, indicating joint angles for a reference individual ('A Professional') and a 'Test' subject, along with the difference and respective timestamps.
-
-The data is from a volleyball serve.
-Your task is to summarize this data concisely and informatively. Focus on identifying significant deviations, general trends, and key observations for each joint group (arms, legs, shoulders). Present the summary in a highly readable format, using bullet points for clarity.
-You are summarizing this to the test subject, so keep the language clear and direct, avoiding technical jargon where possible. Refer to them as "you" rather than "the tets subject." Remain professional and helpful.
-Do NOT NOT NOT use the frame number to point out the time of an action, but rather which part of the serving motion it is part of.
-Offer a couple tips or things to improve on.
-
-Data to Analyze:
-
-{outputtext}
-
-Summary Requirements:
-
-Provide an overall introductory observation.
-Group findings by joint (e.g., Left Arm, Right Arm, Left Shoulder, Right Shoulder, Left Leg, Right Leg).
-For each joint, note:
-The general magnitude of differences.
-Whether the 'Test' subject's angle is consistently higher or lower than 'the professional's'.
-Any notable trends over the frames (e.g., increasing/decreasing difference, specific frames with extreme deviations).
-Conclude with a high-level summary of the most pronounced differences.
-Keep the language direct and avoid conversational filler."'''
-)
-print(response.text)
-
 def plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv, output_dir="Script/outputcsv/angle_graphs"):
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -770,3 +739,34 @@ test_angles_csv = os.path.join("Script", "dataAnalysis", "media", "test_angles.c
 # Use these variables everywhere you reference the files:
 plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv)
 outputtext = compare_angles_and_report(donny_angles_csv, test_angles_csv, threshold_degrees=30)
+
+from google import genai
+
+client = genai.Client(api_key="AIzaSyC3M6h-GS102ruxezI6dGcLYYLdVM7aXZ0")
+
+outputtext = "\n".join(outputtext)
+response = client.models.generate_content(
+    model="gemini-2.5-flash", contents=f'''"Analyze the following stream of biomechanical data. Each line represents a single frame, indicating joint angles for a reference individual ('A Professional') and a 'Test' subject, along with the difference and respective timestamps.
+
+The data is from a volleyball serve.
+Your task is to summarize this data concisely and informatively. Focus on identifying significant deviations, general trends, and key observations for each joint group (arms, legs, shoulders). Present the summary in a highly readable format, using bullet points for clarity.
+You are summarizing this to the test subject, so keep the language clear and direct, avoiding technical jargon where possible. Refer to them as "you" rather than "the tets subject." Remain professional and helpful.
+Do NOT NOT NOT use the frame number to point out the time of an action, but rather which part of the serving motion it is part of.
+Offer a couple tips or things to improve on.
+
+Data to Analyze:
+
+{outputtext}
+
+Summary Requirements:
+
+Provide an overall introductory observation.
+Group findings by joint (e.g., Left Arm, Right Arm, Left Shoulder, Right Shoulder, Left Leg, Right Leg).
+For each joint, note:
+The general magnitude of differences.
+Whether the 'Test' subject's angle is consistently higher or lower than 'the professional's'.
+Any notable trends over the frames (e.g., increasing/decreasing difference, specific frames with extreme deviations).
+Conclude with a high-level summary of the most pronounced differences.
+Keep the language direct and avoid conversational filler."'''
+)
+print(response.text)
