@@ -1,6 +1,7 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import csv
 
 # Initialize MediaPipe pose and hands
 mp_pose = mp.solutions.pose
@@ -18,6 +19,8 @@ body_joints = {
     25: "Left Knee", 26: "Right Knee",
     27: "Left Ankle", 28: "Right Ankle"
 }
+
+data = []
 
 # Open video file (replace 'your_video.mp4' with your video file path)
 cap = cv2.VideoCapture('your_video.mp4')
@@ -75,9 +78,29 @@ while cap.isOpened():
                 cv2.putText(frame, f"F{i}", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
             mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
+    # Collect data for analysis
+    if results.pose_landmarks:
+        row = [cap.get(cv2.CAP_PROP_POS_MSEC)]  # Timestamp in milliseconds
+        for idx in body_joints.keys():
+            lm = results.pose_landmarks.landmark[idx]
+            row.extend([lm.x, lm.y, lm.z])  # Normalized coordinates
+        if hand_results.multi_hand_landmarks:
+            for hand_landmarks in hand_results.multi_hand_landmarks:
+                for lm in hand_landmarks.landmark:
+                    row.extend([lm.x, lm.y, lm.z])  # Normalized coordinates of hand landmarks
+        data.append(row)
+    
+    # Display the frame with pose and hand landmarks
     cv2.imshow('Pose Detection', frame)
     if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
         break
 
 cap.release()
 cv2.destroyAllWindows()
+
+with open("analysis.csv", mode="w", newline="") as file:
+    writer = csv.writer(file)
+    # write all rows
+    writer.writerows(data)
+    
+print("Analysis saved to analysis.csv")
