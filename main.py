@@ -2,17 +2,12 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-# Initialize MediaPipe pose
+# Initialize MediaPipe pose and hands
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+mp_hands = mp.solutions.hands
+pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5)
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 mp_drawing = mp.solutions.drawing_utils
-
-# Load your image
-image = cv2.imread('serve.jpg')  # Replace with your image path
-image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-# Process the image and find pose landmarks
-results = pose.process(image_rgb)
 
 # List of body joints to consider (excluding face)
 body_joints = {
@@ -24,50 +19,65 @@ body_joints = {
     27: "Left Ankle", 28: "Right Ankle"
 }
 
-if results.pose_landmarks:
-    h, w, _ = image.shape
-    joint_positions = {}
-    for idx, name in body_joints.items():
-        lm = results.pose_landmarks.landmark[idx]
-        x, y = int(lm.x * w), int(lm.y * h)
-        joint_positions[name] = (x, y)
-        cv2.circle(image, (x, y), 5, (0, 255, 0), -1)
-        cv2.putText(image, name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+# Open video capture (0 for webcam, or provide video file path)
+cap = cv2.VideoCapture(0)
 
-    # Example: Calculate angles for arms and legs
-    def calc_angle(a, b, c):
-        a = np.array(a)
-        b = np.array(b)
-        c = np.array(c)
-        ba = a - b
-        bc = c - b
-        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-        angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
-        return np.degrees(angle)
+def calc_angle(a, b, c):
+    a = np.array(a)
+    b = np.array(b)
+    c = np.array(c)
+    ba = a - b
+    bc = c - b
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
+    return np.degrees(angle)
 
-    # Left Arm
-    if all(j in joint_positions for j in ["Left Shoulder", "Left Elbow", "Left Wrist"]):
-        angle = calc_angle(joint_positions["Left Shoulder"], joint_positions["Left Elbow"], joint_positions["Left Wrist"])
-        print(f"Left Arm Angle: {angle:.2f} degrees")
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
 
-    # Right Arm
-    if all(j in joint_positions for j in ["Right Shoulder", "Right Elbow", "Right Wrist"]):
-        angle = calc_angle(joint_positions["Right Shoulder"], joint_positions["Right Elbow"], joint_positions["Right Wrist"])
-        print(f"Right Arm Angle: {angle:.2f} degrees")
+    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = pose.process(image_rgb)
+    hand_results = hands.process(image_rgb)
 
-    # Left Leg
-    if all(j in joint_positions for j in ["Left Hip", "Left Knee", "Left Ankle"]):
-        angle = calc_angle(joint_positions["Left Hip"], joint_positions["Left Knee"], joint_positions["Left Ankle"])
-        print(f"Left Leg Angle: {angle:.2f} degrees")
+    if results.pose_landmarks:
+        h, w, _ = frame.shape
+        joint_positions = {}
+        for idx, name in body_joints.items():
+            lm = results.pose_landmarks.landmark[idx]
+            x, y = int(lm.x * w), int(lm.y * h)
+            joint_positions[name] = (x, y)
+            cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
+            cv2.putText(frame, name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
-    # Right Leg
-    if all(j in joint_positions for j in ["Right Hip", "Right Knee", "Right Ankle"]):
-        angle = calc_angle(joint_positions["Right Hip"], joint_positions["Right Knee"], joint_positions["Right Ankle"])
-        print(f"Right Leg Angle: {angle:.2f} degrees")
+        # Calculate and display angles for arms and legs
+        if all(j in joint_positions for j in ["Left Shoulder", "Left Elbow", "Left Wrist"]):
+            angle = calc_angle(joint_positions["Left Shoulder"], joint_positions["Left Elbow"], joint_positions["Left Wrist"])
+            cv2.putText(frame, f"L Arm: {angle:.1f}", joint_positions["Left Elbow"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        if all(j in joint_positions for j in ["Right Shoulder", "Right Elbow", "Right Wrist"]):
+            angle = calc_angle(joint_positions["Right Shoulder"], joint_positions["Right Elbow"], joint_positions["Right Wrist"])
+            cv2.putText(frame, f"R Arm: {angle:.1f}", joint_positions["Right Elbow"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        if all(j in joint_positions for j in ["Left Hip", "Left Knee", "Left Ankle"]):
+            angle = calc_angle(joint_positions["Left Hip"], joint_positions["Left Knee"], joint_positions["Left Ankle"])
+            cv2.putText(frame, f"L Leg: {angle:.1f}", joint_positions["Left Knee"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        if all(j in joint_positions for j in ["Right Hip", "Right Knee", "Right Ankle"]):
+            angle = calc_angle(joint_positions["Right Hip"], joint_positions["Right Knee"], joint_positions["Right Ankle"])
+            cv2.putText(frame, f"R Leg: {angle:.1f}", joint_positions["Right Knee"], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
-    # Show the image with joints
-    cv2.imshow('Pose Detection', image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-else:
-    print("No pose detected.")
+    # Draw hand landmarks (fingers)
+    if hand_results.multi_hand_landmarks:
+        h, w, _ = frame.shape
+        for hand_landmarks in hand_results.multi_hand_landmarks:
+            for i, lm in enumerate(hand_landmarks.landmark):
+                x, y = int(lm.x * w), int(lm.y * h)
+                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
+                cv2.putText(frame, f"F{i}", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+    cv2.imshow('Pose Detection', frame)
+    if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
+        break
+
+cap.release()
+cv2.destroyAllWindows()
