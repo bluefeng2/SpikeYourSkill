@@ -214,7 +214,7 @@ def plot_ball_wrist_distance(ball_csv, wrist_csv, which_wrist='right'):
     plt.title(f'Distance Between Ball Center and {which_wrist.capitalize()} Wrist')
     plt.grid(True)
     plt.legend()
-    plt.savefig(os.path.join("media/", "timing.png"))
+    plt.savefig(os.path.join("m", "timing.png"))
     plt.show()
 
 if __name__ == "__main__":
