@@ -4,6 +4,7 @@ def main(filePath):
     import cv2
     import mediapipe as mp
     import numpy as np
+    import pandas as pd
 
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5)
@@ -41,6 +42,7 @@ def main(filePath):
         return np.degrees(angle)
 
     angle_data = []
+    coords_data = []
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -52,11 +54,14 @@ def main(filePath):
         row = [cap.get(cv2.CAP_PROP_POS_MSEC)]  # Timestamp in milliseconds
 
         coords = {}
+        coords_row = {'frame': int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1}
         if results.pose_landmarks:
             h, w, _ = frame.shape
             for idx in range(33):
                 lm = results.pose_landmarks.landmark[idx]
                 coords[str(idx)] = [lm.x, lm.y]
+                coords_row[f"{idx}_x"] = lm.x
+                coords_row[f"{idx}_y"] = lm.y
             # Draw and label angles
             for idxs in relevant_joints:
                 try:
@@ -73,10 +78,14 @@ def main(filePath):
                     angle = ""
                 row.append(angle)
         else:
-            # If no pose detected, fill with empty angles
+            # If no pose detected, fill with empty angles and coords
             row += [""] * len(relevant_joints)
+            for idx in range(33):
+                coords_row[f"{idx}_x"] = ""
+                coords_row[f"{idx}_y"] = ""
 
         angle_data.append(row)
+        coords_data.append(coords_row)
 
         cv2.imshow('Pose with Angles', frame)
         if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
@@ -92,7 +101,12 @@ def main(filePath):
         writer.writerow(header)
         writer.writerows(angle_data)
 
+    # Write coords to CSV
+    coords_df = pd.DataFrame(coords_data)
+    coords_df.to_csv(filePath.split(".")[0] + "_coords.csv", index=False)
+
     print(f"Angles saved to {filePath.split('.')[0]}_angles.csv")
+    print(f"Coords saved to {filePath.split('.')[0]}_coords.csv")
 
 # Example usage:
 for file in [
