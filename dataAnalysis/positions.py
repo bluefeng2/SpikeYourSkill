@@ -35,10 +35,12 @@ def detect_ball_yolov8(video_path, output_csv, weights_path='best.pt', conf_thre
                 cv2.putText(frame, f'({cx}, {cy})', (cx + 10, cy - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
+            '''
             cv2.imshow('YOLOv8 Ball Detection', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
+            '''
+            
             frame_num += 1
 
     cap.release()
@@ -65,7 +67,7 @@ def interpolate_ball_positions(input_csv, output_csv):
 if __name__ == "__main__":
     video_path = "dataAnalysis\\media\\donny_1.mp4"  # Change to your video file
     output_csv = "ball_positions.csv"
-    weights_path = r"C:\Users\Gordon Li\VbForm\VolleyballForm\dataAnalysis\data\best.pt"
+    weights_path = r"dataAnalysis\data\best.pt"
     print("Weights exist?", os.path.exists(weights_path), weights_path)
     detect_ball_yolov8(video_path, output_csv, weights_path=weights_path)
     interpolate_ball_positions(output_csv, 'ball_positions_interpolated.csv')

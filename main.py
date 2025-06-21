@@ -314,3 +314,275 @@ for stage, test_indices in stage_to_test_frames.items():
 
 cap.release()
 print("Overlay stage videos saved to outputcsv/test_stages_overlay/")
+
+# ----------- PART 4: Generate full wireframe overlay video first, then cut for each stage -----------
+
+# Add hands to the wireframe
+ALL_JOINTS = [11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28]
+POSE_CONNECTIONS = [
+    (11, 13), (13, 15), (15, 17), (17, 19), (19, 21), (21, 15),  # Left arm and hand
+    (12, 14), (14, 16), (16, 18), (18, 20), (20, 22), (22, 16),  # Right arm and hand
+    (23, 25), (25, 27),  # Left leg
+    (24, 26), (26, 28),  # Right leg
+    (11, 12),            # Shoulders
+    (23, 24),            # Hips
+    (11, 23), (12, 24),  # Torso sides
+]
+
+output_path = "outputcsv/test_wireframe_duo_full.mp4"
+cap = cv2.VideoCapture(video_path)
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+test_len = len(test_df)
+donny_len = len(donny_df)
+
+frame_indices_by_stage = {stage: [] for stage in stages}
+
+for idx in range(min(test_len, int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))):
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Draw test skeleton (red)
+    coords = {}
+    if idx < test_len:
+        row = test_df.iloc[idx]
+        for joint in ALL_JOINTS:
+            x_col = f"{joint}_x"
+            y_col = f"{joint}_y"
+            if pd.notnull(row[x_col]) and pd.notnull(row[y_col]):
+                coords[joint] = (int(row[x_col] * width), int(row[y_col] * height))
+        for j1, j2 in POSE_CONNECTIONS:
+            if j1 in coords and j2 in coords:
+                cv2.line(frame, coords[j1], coords[j2], (0, 0, 255), 2)
+        for (x, y) in coords.values():
+            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
+
+    # Draw Donny_1 skeleton (blue), aligned to test
+    if idx < donny_len and idx < test_len:
+        row_donny = donny_df.iloc[idx]
+        coords_donny = {}
+        for joint in ALL_JOINTS:
+            x_col = f"{joint}_x"
+            y_col = f"{joint}_y"
+            if pd.notnull(row_donny[x_col]) and pd.notnull(row_donny[y_col]):
+                coords_donny[joint] = (float(row_donny[x_col]), float(row_donny[y_col]))
+
+        if 11 in coords and 12 in coords and 11 in coords_donny and 12 in coords_donny:
+            g11 = coords[11]
+            g12 = coords[12]
+            g_center = ((g11[0] + g12[0]) / 2, (g11[1] + g12[1]) / 2)
+            g_shoulder_dist = ((g11[0] - g12[0]) ** 2 + (g11[1] - g12[1]) ** 2) ** 0.5
+
+            d11 = (coords_donny[11][0] * width, coords_donny[11][1] * height)
+            d12 = (coords_donny[12][0] * width, coords_donny[12][1] * height)
+            d_center = ((d11[0] + d12[0]) / 2, (d11[1] + d12[1]) / 2)
+            d_shoulder_dist = ((d11[0] - d12[0]) ** 2 + (d11[1] - d12[1]) ** 2) ** 0.5
+
+            scale = g_shoulder_dist / d_shoulder_dist if d_shoulder_dist > 0 else 1.0
+            dx = g_center[0] - d_center[0] * scale
+            dy = g_center[1] - d_center[1] * scale
+
+            coords_donny_trans = {}
+            for joint, (x, y) in coords_donny.items():
+                x_img = x * width * scale + dx
+                y_img = y * height * scale + dy
+                coords_donny_trans[joint] = (int(x_img), int(y_img))
+            for j1, j2 in POSE_CONNECTIONS:
+                if j1 in coords_donny_trans and j2 in coords_donny_trans:
+                    cv2.line(frame, coords_donny_trans[j1], coords_donny_trans[j2], (255, 0, 0), 2)
+            for (x, y) in coords_donny_trans.values():
+                cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+        else:
+            coords_donny_img = {}
+            for joint, (x, y) in coords_donny.items():
+                x_img = int(x * width)
+                y_img = int(y * height)
+                coords_donny_img[joint] = (x_img, y_img)
+            for j1, j2 in POSE_CONNECTIONS:
+                if j1 in coords_donny_img and j2 in coords_donny_img:
+                    cv2.line(frame, coords_donny_img[j1], coords_donny_img[j2], (255, 0, 0), 2)
+            for (x, y) in coords_donny_img.values():
+                cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+
+    out.write(frame)
+
+    # For each stage, record which frames belong to it
+    for stage, indices in stage_to_test_frames.items():
+        if idx in indices:
+            frame_indices_by_stage[stage].append(idx)
+
+out.release()
+cap.release()
+print(f"Full wireframe overlay video saved to {output_path}")
+
+# ----------- PART 5: Cut up the overlay video for each stage -----------
+
+cap = cv2.VideoCapture(output_path)
+os.makedirs("outputcsv/test_stages_overlay", exist_ok=True)
+
+for stage, indices in frame_indices_by_stage.items():
+    out_path = f"outputcsv/test_stages_overlay/test_{stage}_overlay.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    for idx in indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if ret:
+            out.write(frame)
+    out.release()
+    print(f"Saved {out_path}")
+
+cap.release()
+print("Overlay stage videos saved to outputcsv/test_stages_overlay/")
+
+# ----------- PART 6: Ball position and distance to chest/wrist -----------
+
+import cv2
+import csv
+from ultralytics import YOLO
+import os
+import pandas as pd
+
+def detect_ball_yolov8(video_path, output_csv, weights_path='best.pt', conf_thres=0.25):
+    model = YOLO(weights_path)
+    cap = cv2.VideoCapture(video_path)
+
+    with open(output_csv, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['frame', 'x', 'y'])
+
+        frame_num = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            results = model.predict(source=frame, conf=conf_thres, verbose=False)
+            boxes = results[0].boxes.xyxy.cpu().numpy() if results[0].boxes is not None else []
+
+            # If any detections, take the one with highest confidence
+            if len(boxes) > 0:
+                confs = results[0].boxes.conf.cpu().numpy()
+                idx = confs.argmax()
+                x1, y1, x2, y2 = boxes[idx][:4]
+                cx = int((x1 + x2) / 2)
+                cy = int((y1 + y2) / 2)
+                writer.writerow([frame_num, cx, cy])
+                # Draw bounding box and center
+                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
+                cv2.putText(frame, f'({cx}, {cy})', (cx + 10, cy - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+            '''
+            cv2.imshow('YOLOv8 Ball Detection', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            '''
+            
+            frame_num += 1
+
+    cap.release()
+    cv2.destroyAllWindows()
+    
+def interpolate_ball_positions(input_csv, output_csv):
+    # Read the CSV
+    df = pd.read_csv(input_csv)
+    # Set frame as the index for interpolation
+    df = df.set_index('frame')
+    # Reindex to include all frames between min and max
+    all_frames = range(df.index.min(), df.index.max() + 1)
+    df = df.reindex(all_frames)
+    # Interpolate missing x and y values linearly
+    df['x'] = df['x'].interpolate()
+    df['y'] = df['y'].interpolate()
+    # Optionally, fill any remaining NaNs (at start/end) with nearest values
+    df['x'] = df['x'].fillna(method='bfill').fillna(method='ffill')
+    df['y'] = df['y'].fillna(method='bfill').fillna(method='ffill')
+    # Reset index and save
+    df = df.reset_index().rename(columns={'index': 'frame'})
+    df.to_csv(output_csv, index=False)
+    
+def analyze_ball_and_body(ball_csv, coords_csv, output_csv, width, height):
+    import numpy as np
+    import pandas as pd
+    ball_df = pd.read_csv(ball_csv)
+    coords_df = pd.read_csv(coords_csv)
+
+    results = []
+    contact_frame = None
+    contact_threshold = 40  # pixels, adjust as needed
+
+    for _, row in ball_df.iterrows():
+        frame = int(row['frame'])
+        ball_x = row['x']
+        ball_y = row['y']
+
+        # Get corresponding coords row
+        if frame >= len(coords_df):
+            continue
+        coords_row = coords_df.iloc[frame]
+
+        # Get chest (midpoint of shoulders 11 and 12)
+        try:
+            s11_x = float(coords_row['11_x']) * width
+            s11_y = float(coords_row['11_y']) * height
+            s12_x = float(coords_row['12_x']) * width
+            s12_y = float(coords_row['12_y']) * height
+            chest_x = (s11_x + s12_x) / 2
+            chest_y = (s11_y + s12_y) / 2
+        except Exception:
+            chest_x, chest_y = np.nan, np.nan
+
+        # Get right wrist (16)
+        try:
+            rw_x = float(coords_row['16_x']) * width
+            rw_y = float(coords_row['16_y']) * height
+        except Exception:
+            rw_x, rw_y = np.nan, np.nan
+
+        # Distances
+        dist_ball_chest = np.sqrt((ball_x - chest_x) ** 2 + (ball_y - chest_y) ** 2) if not (np.isnan(chest_x) or np.isnan(chest_y)) else np.nan
+        dist_ball_rw = np.sqrt((ball_x - rw_x) ** 2 + (ball_y - rw_y) ** 2) if not (np.isnan(rw_x) or np.isnan(rw_y)) else np.nan
+
+        # Check for contact
+        contact = 0
+        if not np.isnan(dist_ball_rw) and dist_ball_rw < contact_threshold:
+            if contact_frame is None:
+                contact_frame = frame
+            contact = 1
+
+        results.append({
+            'frame': frame,
+            'ball_x': ball_x,
+            'ball_y': ball_y,
+            'chest_x': chest_x,
+            'chest_y': chest_y,
+            'rw_x': rw_x,
+            'rw_y': rw_y,
+            'dist_ball_chest': dist_ball_chest,
+            'dist_ball_right_wrist': dist_ball_rw,
+            'contact': contact
+        })
+
+    pd.DataFrame(results).to_csv(output_csv, index=False)
+    print(f"Saved ball-body analysis to {output_csv}")
+    if contact_frame is not None:
+        print(f"First contact frame: {contact_frame}")
+
+video_path = "dataAnalysis\\media\\donny_1.mp4"  # Change to your video file
+output_csv = "ball_positions.csv"
+weights_path = r"dataAnalysis\data\best.pt"
+print("Weights exist?", os.path.exists(weights_path), weights_path)
+detect_ball_yolov8(video_path, output_csv, weights_path=weights_path)
+interpolate_ball_positions(output_csv, 'ball_positions_interpolated.csv')
+
+# Example usage after all previous processing:
+# Make sure you have ball_positions_interpolated.csv and test_coords.csv
+ball_csv = "ball_positions_interpolated.csv"  # Should be generated by your ball detector/interpolator
+coords_csv = "dataAnalysis\\media\\test_coords.csv"
+output_csv = "outputcsv/ball_body_analysis.csv"
+
+analyze_ball_and_body(ball_csv, coords_csv, output_csv, width, height)
