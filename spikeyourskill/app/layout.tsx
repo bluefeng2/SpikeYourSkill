@@ -3,6 +3,8 @@ import { Raleway, Ubuntu } from "next/font/google";
 import "./globals.css";
 import {motion} from "framer-motion"; 
 import {ReactNode} from "react";
+import Navbar from "./components/Navbar";
+
 const raleWay = Raleway({
   variable: "--font-raleway",
   subsets: ["latin"],
@@ -31,6 +33,7 @@ export default function RootLayout({
       <body
         className={`${raleWay.variable} ${uBuntu.variable} antialiased`}
       >
+        <Navbar/>
         {children}
       </body>
     </html>
