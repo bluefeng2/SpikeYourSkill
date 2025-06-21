@@ -417,26 +417,6 @@ out.release()
 cap.release()
 print(f"Full wireframe overlay video saved to {output_path}")
 
-# ----------- PART 5: Cut up the overlay video for each stage -----------
-
-cap = cv2.VideoCapture(output_path)
-os.makedirs("outputcsv/test_stages_overlay", exist_ok=True)
-
-for stage, indices in frame_indices_by_stage.items():
-    out_path = f"outputcsv/test_stages_overlay/test_{stage}_overlay.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
-    for idx in indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = cap.read()
-        if ret:
-            out.write(frame)
-    out.release()
-    print(f"Saved {out_path}")
-
-cap.release()
-print("Overlay stage videos saved to outputcsv/test_stages_overlay/")
-
 # ----------- PART 6: Ball position and distance to chest/wrist -----------
 
 import cv2
@@ -508,69 +488,89 @@ def interpolate_ball_positions(input_csv, output_csv):
 def analyze_ball_and_body(ball_csv, coords_csv, output_csv, width, height):
     import numpy as np
     import pandas as pd
-    ball_df = pd.read_csv(ball_csv)
-    coords_df = pd.read_csv(coords_csv)
+    ball_df = pd.read_csv(ball_csv).set_index('frame')
+    coords_df = pd.read_csv(coords_csv).set_index('frame')
 
     results = []
     contact_frame = None
-    contact_threshold = 40  # pixels, adjust as needed
+    contact_time = None
+    contact_threshold = 200  # pixels, adjust as needed
 
-    for _, row in ball_df.iterrows():
-        frame = int(row['frame'])
-        ball_x = row['x']
-        ball_y = row['y']
+    # Use only frames present in both
+    common_frames = ball_df.index.intersection(coords_df.index)
+    for frame in common_frames:
+        bx, by = ball_df.loc[frame, ['x', 'y']]
+        s11_x = coords_df.loc[frame, '11_x']
+        s11_y = coords_df.loc[frame, '11_y']
+        s12_x = coords_df.loc[frame, '12_x']
+        s12_y = coords_df.loc[frame, '12_y']
+        rw_x = coords_df.loc[frame, '16_x']
+        rw_y = coords_df.loc[frame, '16_y']
 
-        # Get corresponding coords row
-        if frame >= len(coords_df):
-            continue
-        coords_row = coords_df.iloc[frame]
-
-        # Get chest (midpoint of shoulders 11 and 12)
-        try:
-            s11_x = float(coords_row['11_x']) * width
-            s11_y = float(coords_row['11_y']) * height
-            s12_x = float(coords_row['12_x']) * width
-            s12_y = float(coords_row['12_y']) * height
-            chest_x = (s11_x + s12_x) / 2
-            chest_y = (s11_y + s12_y) / 2
-        except Exception:
+        # Convert to pixel coordinates if not nan
+        if not np.isnan([s11_x, s11_y, s12_x, s12_y]).any():
+            s11_x_pix = float(s11_x) * width
+            s11_y_pix = float(s11_y) * height
+            s12_x_pix = float(s12_x) * width
+            s12_y_pix = float(s12_y) * height
+            chest_x = (s11_x_pix + s12_x_pix) / 2
+            chest_y = (s11_y_pix + s12_y_pix) / 2
+        else:
             chest_x, chest_y = np.nan, np.nan
 
-        # Get right wrist (16)
-        try:
-            rw_x = float(coords_row['16_x']) * width
-            rw_y = float(coords_row['16_y']) * height
-        except Exception:
-            rw_x, rw_y = np.nan, np.nan
+        if not np.isnan([rw_x, rw_y]).any():
+            rw_x_pix = float(rw_x) * width
+            rw_y_pix = float(rw_y) * height
+        else:
+            rw_x_pix, rw_y_pix = np.nan, np.nan
 
-        # Distances
-        dist_ball_chest = np.sqrt((ball_x - chest_x) ** 2 + (ball_y - chest_y) ** 2) if not (np.isnan(chest_x) or np.isnan(chest_y)) else np.nan
-        dist_ball_rw = np.sqrt((ball_x - rw_x) ** 2 + (ball_y - rw_y) ** 2) if not (np.isnan(rw_x) or np.isnan(rw_y)) else np.nan
+        # Distance to chest
+        if not np.isnan([bx, by, chest_x, chest_y]).any():
+            dist_ball_chest = np.sqrt((bx - chest_x) ** 2 + (by - chest_y) ** 2)
+        else:
+            dist_ball_chest = np.nan
 
+        # Distance to right wrist (use your provided logic)
+        if np.isnan([bx, by, rw_x, rw_y]).any():
+            dist_ball_rw = np.nan
+        else:
+            dist_ball_rw = np.sqrt((bx - rw_x_pix) ** 2 + (by - rw_y_pix) ** 2)
+        print(dist_ball_rw)
         # Check for contact
         contact = 0
         if not np.isnan(dist_ball_rw) and dist_ball_rw < contact_threshold:
             if contact_frame is None:
                 contact_frame = frame
+                # Try to get timestamp if available
+                if 'timestamp_milis' in coords_df.columns:
+                    contact_time = coords_df.loc[frame, 'timestamp_milis']
+                elif 'timestamp_millis' in coords_df.columns:
+                    contact_time = coords_df.loc[frame, 'timestamp_millis']
+                else:
+                    contact_time = None
             contact = 1
 
         results.append({
             'frame': frame,
-            'ball_x': ball_x,
-            'ball_y': ball_y,
+            'ball_x': bx,
+            'ball_y': by,
             'chest_x': chest_x,
             'chest_y': chest_y,
-            'rw_x': rw_x,
-            'rw_y': rw_y,
+            'rw_x': rw_x_pix,
+            'rw_y': rw_y_pix,
             'dist_ball_chest': dist_ball_chest,
             'dist_ball_right_wrist': dist_ball_rw,
-            'contact': contact
+            'contact': contact,
+            'contact_frame': contact_frame,
+            'contact_time': contact_time
         })
 
     pd.DataFrame(results).to_csv(output_csv, index=False)
     print(f"Saved ball-body analysis to {output_csv}")
     if contact_frame is not None:
         print(f"First contact frame: {contact_frame}")
+        if contact_time is not None:
+            print(f"Contact time (ms): {contact_time}")
 
 video_path = "dataAnalysis\\media\\donny_1.mp4"  # Change to your video file
 output_csv = "ball_positions.csv"
@@ -586,3 +586,46 @@ coords_csv = "dataAnalysis\\media\\test_coords.csv"
 output_csv = "outputcsv/ball_body_analysis.csv"
 
 analyze_ball_and_body(ball_csv, coords_csv, output_csv, width, height)
+
+def plot_ball_wrist_distance(ball_csv, coords_csv, which_wrist='right'):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    ball_df = pd.read_csv(ball_csv).set_index('frame')
+    coords_df = pd.read_csv(coords_csv).set_index('frame')
+
+    # Choose wrist index
+    wrist_idx = 16 if which_wrist == 'right' else 15
+    wrist_x_col = f"{wrist_idx}_x"
+    wrist_y_col = f"{wrist_idx}_y"
+
+    # If coords are normalized, you need width/height for pixel conversion
+    # Use the same width/height as the video
+    width = int(ball_df['x'].max() * 1.1)
+    height = int(ball_df['y'].max() * 1.1)
+
+    # Align frames and compute distance
+    common_frames = ball_df.index.intersection(coords_df.index)
+    distances = []
+    for frame in common_frames:
+        bx, by = ball_df.loc[frame, ['x', 'y']]
+        wx = coords_df.loc[frame, wrist_x_col]
+        wy = coords_df.loc[frame, wrist_y_col]
+        if np.isnan([bx, by, wx, wy]).any():
+            distances.append(np.nan)
+        else:
+            wx_pix = float(wx) * width
+            wy_pix = float(wy) * height
+            dist = np.sqrt((bx - wx_pix) ** 2 + (by - wy_pix) ** 2)
+            distances.append(dist)
+
+    plt.figure(figsize=(12, 5))
+    plt.plot(list(common_frames), distances, label=f'Ball to {which_wrist} wrist distance (pixels)', color='blue')
+    plt.xlabel('Frame')
+    plt.ylabel('Distance (pixels)')
+    plt.title(f'Distance from Ball to {which_wrist.capitalize()} Wrist')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+# Example usage:
+plot_ball_wrist_distance("ball_positions_interpolated.csv", "dataAnalysis\\media\\test_coords.csv", which_wrist='right')

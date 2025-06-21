@@ -221,9 +221,8 @@ if __name__ == "__main__":
         ("donny_1", "dataAnalysis/media/donny_1.mp4"),
         ("donny_2", "dataAnalysis/media/donny_2.mp4"),
         ("donny_3", "dataAnalysis/media/donny_3.mp4"),
-        ("gordon",  "dataAnalysis/media/gordon.mp4"),
     ]
-    weights_path = r"C:\Users\Gordon Li\VbForm\VolleyballForm\dataAnalysis\data\best.pt"
+    weights_path = r"dataAnalysis\data\best.pt"
 
     all_distances = {}
     for label, video_path in video_files:
