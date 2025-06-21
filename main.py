@@ -418,7 +418,7 @@ cap.release()
 print(f"Full wireframe overlay video saved to {output_path}")
 
 # ----------- PART 6: Ball position and distance to chest/wrist -----------
-
+'''
 import cv2
 import csv
 from ultralytics import YOLO
@@ -456,11 +456,11 @@ def detect_ball_yolov8(video_path, output_csv, weights_path='best.pt', conf_thre
                 cv2.putText(frame, f'({cx}, {cy})', (cx + 10, cy - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            '''
+            
             cv2.imshow('YOLOv8 Ball Detection', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            '''
+            
             
             frame_num += 1
 
@@ -629,3 +629,109 @@ def plot_ball_wrist_distance(ball_csv, coords_csv, which_wrist='right'):
 
 # Example usage:
 plot_ball_wrist_distance("ball_positions_interpolated.csv", "dataAnalysis\\media\\test_coords.csv", which_wrist='right')
+'''
+def compare_angles_and_report(donny_angles_csv, test_angles_csv, threshold_degrees=30):
+    import pandas as pd
+    import numpy as np
+
+    donny_df = pd.read_csv(donny_angles_csv)
+    test_df = pd.read_csv(test_angles_csv)
+
+    # Align on frame count (use min length)
+    min_len = min(len(donny_df), len(test_df))
+    donny_df = donny_df.iloc[:min_len]
+    test_df = test_df.iloc[:min_len]
+
+    # Get joint columns (skip timestamp)
+    joint_columns = [col for col in donny_df.columns if col != "timestamp_milis"]
+
+    differences = []
+    for i in range(min_len):
+        for joint in joint_columns:
+            try:
+                d_angle = float(donny_df.iloc[i][joint])
+                t_angle = float(test_df.iloc[i][joint])
+            except Exception:
+                continue
+            if np.isnan(d_angle) or np.isnan(t_angle):
+                continue
+            diff = abs(d_angle - t_angle)
+            if diff > threshold_degrees:
+                differences.append({
+                    "frame": i,
+                    "joint": joint,
+                    "donny_angle": d_angle,
+                    "test_angle": t_angle,
+                    "difference": diff,
+                    "donny_time": donny_df.iloc[i].get("timestamp_milis", None),
+                    "test_time": test_df.iloc[i].get("timestamp_milis", None)
+                })
+
+    # Also check for timing mismatches (if timestamps are available)
+    timing_mismatches = []
+    if "timestamp_milis" in donny_df.columns and "timestamp_milis" in test_df.columns:
+        for i in range(min_len):
+            d_time = donny_df.iloc[i]["timestamp_milis"]
+            t_time = test_df.iloc[i]["timestamp_milis"]
+            if not pd.isna(d_time) and not pd.isna(t_time):
+                if abs(float(d_time) - float(t_time)) > 100:  # e.g., more than 100 ms difference
+                    timing_mismatches.append({
+                        "frame": i,
+                        "donny_time": d_time,
+                        "test_time": t_time,
+                        "time_difference_ms": abs(float(d_time) - float(t_time))
+                    })
+    values = []
+    # Output results
+    print("\n--- Angle Differences > {} degrees ---".format(threshold_degrees))
+    for diff in differences:
+        print(f"Frame {diff['frame']} | Joint: {diff['joint']} | Donny: {diff['donny_angle']:.2f} | Test: {diff['test_angle']:.2f} | Diff: {diff['difference']:.2f} deg | Donny time: {diff['donny_time']} | Test time: {diff['test_time']}")
+        values.append(f"Frame {diff['frame']} | Joint: {diff['joint']} | Donny: {diff['donny_angle']:.2f} | Test: {diff['test_angle']:.2f} | Diff: {diff['difference']:.2f} deg | Donny time: {diff['donny_time']} | Test time: {diff['test_time']}")
+    print("\n--- Timing Mismatches (>100ms) ---")
+    for tm in timing_mismatches:
+        print(f"Frame {tm['frame']} | Donny time: {tm['donny_time']} | Test time: {tm['test_time']} | Diff: {tm['time_difference_ms']} ms")
+        values.append(f"Frame {tm['frame']} | Donny time: {tm['donny_time']} | Test time: {tm['test_time']} | Diff: {tm['time_difference_ms']} ms")
+    
+    # Optionally, save to CSV
+    pd.DataFrame(differences).to_csv("outputcsv/angle_differences_over_30deg.csv", index=False)
+    pd.DataFrame(timing_mismatches).to_csv("outputcsv/timing_mismatches_over_100ms.csv", index=False)
+    print("\nSaved detailed difference reports to outputcsv/angle_differences_over_30deg.csv and outputcsv/timing_mismatches_over_100ms.csv")
+
+    return values
+# Example usage:
+outputtext = compare_angles_and_report(
+    "dataAnalysis\\media\\donny_1_angles.csv",
+    "dataAnalysis\\media\\test_angles.csv",
+    threshold_degrees=30
+)
+
+from google import genai
+
+client = genai.Client(api_key="AIzaSyC3M6h-GS102ruxezI6dGcLYYLdVM7aXZ0")
+
+outputtext = "\n".join(outputtext)
+response = client.models.generate_content(
+    model="gemini-2.5-flash", contents=f'''"Analyze the following stream of biomechanical data. Each line represents a single frame, indicating joint angles for a reference individual ('A Professional') and a 'Test' subject, along with the difference and respective timestamps.
+
+The data is from a volleyball serve.
+Your task is to summarize this data concisely and informatively. Focus on identifying significant deviations, general trends, and key observations for each joint group (arms, legs, shoulders). Present the summary in a highly readable format, using bullet points for clarity.
+You are summarizing this to the test subject, so keep the language clear and direct, avoiding technical jargon where possible. Refer to them as "you" rather than "the tets subject." Remain professional and helpful.
+Do NOT NOT NOT use the frame number to point out the time of an action, but rather which part of the serving motion it is part of.
+Offer a couple tips or things to improve on.
+
+Data to Analyze:
+
+{outputtext}
+
+Summary Requirements:
+
+Provide an overall introductory observation.
+Group findings by joint (e.g., Left Arm, Right Arm, Left Shoulder, Right Shoulder, Left Leg, Right Leg).
+For each joint, note:
+The general magnitude of differences.
+Whether the 'Test' subject's angle is consistently higher or lower than 'the professional's'.
+Any notable trends over the frames (e.g., increasing/decreasing difference, specific frames with extreme deviations).
+Conclude with a high-level summary of the most pronounced differences.
+Keep the language direct and avoid conversational filler."'''
+)
+print(response.text)
