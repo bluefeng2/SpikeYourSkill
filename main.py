@@ -19,8 +19,8 @@ body_joints = {
     27: "Left Ankle", 28: "Right Ankle"
 }
 
-# Open video capture (0 for webcam, or provide video file path)
-cap = cv2.VideoCapture(0)
+# Open video file (replace 'your_video.mp4' with your video file path)
+cap = cv2.VideoCapture('your_video.mp4')
 
 def calc_angle(a, b, c):
     a = np.array(a)
