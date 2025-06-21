@@ -38,10 +38,12 @@ def detect_ball_yolov8(video_path, output_csv, weights_path='best.pt', conf_thre
                 cv2.putText(frame, f'({cx}, {cy})', (cx + 10, cy - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
+            '''
             cv2.imshow('YOLOv8 Ball Detection', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
+            '''
+            
             frame_num += 1
 
     cap.release()
