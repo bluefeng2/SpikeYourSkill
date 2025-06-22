@@ -5,7 +5,9 @@ import os
 import zipfile
 import os
 from io import BytesIO
+
 from flask_cors import CORS
+
 def bigasdmaina(locat):
     import os
     import cv2
@@ -175,11 +177,11 @@ def bigasdmaina(locat):
     pro_avg_df = pd.DataFrame(pro_avg, columns=joint_columns)
 
     # DTW align test to pro_avg
-    test_path, _ = dtw_path(test_array, pro_avg)
+    test_path, _ = dtw_path(pro_avg, test_array)
     test_mapping = []
     aligned_test = []
     last_j = 0
-    for j1 in range(min(len(pro_avg), len(test_array))):
+    for j1 in range(len(pro_avg)):
         matches = [j2 for (pj1, j2) in test_path if pj1 == j1]
         if matches:
             test_mapping.append(matches[0])
@@ -229,7 +231,7 @@ def bigasdmaina(locat):
     donny_df = pd.read_csv("Script/dataAnalysis\\media\\donny_1_coords.csv")
 
     # Open the source test video
-    video_path = "Script/dataAnalysis\\media\\test.mp4"
+    video_path = 'Script/dataAnalysis\\media\\test.mp4'
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -247,11 +249,117 @@ def bigasdmaina(locat):
             if not ret:
                 continue
 
-            # Draw Gordon skeleton (red)
+            # Draw test skeleton (red)
+            coords = {}
+            if idx < len(test_df):
+                row = test_df.iloc[idx]
+                for joint in [11,12,13,14,15,16,23,24,25,26,27,28]:
+                    x_col = f"{joint}_x"
+                    y_col = f"{joint}_y"
+                    if pd.notnull(row[x_col]) and pd.notnull(row[y_col]):
+                        coords[joint] = (int(row[x_col] * width), int(row[y_col] * height))
+                for j1, j2 in POSE_CONNECTIONS:
+                    if j1 in coords and j2 in coords:
+                        cv2.line(frame, coords[j1], coords[j2], (0, 0, 255), 2)
+                for (x, y) in coords.values():
+                    cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
+
+            # Draw Donny_1 skeleton (blue), using the corresponding stage frame, aligned to test
+            if i < len(donny_indices):
+                donny_idx = donny_indices[i]
+                if donny_idx < len(donny_df):
+                    row_donny = donny_df.iloc[donny_idx]
+                    coords_donny = {}
+                    for joint in [11,12,13,14,15,16,23,24,25,26,27,28]:
+                        x_col = f"{joint}_x"
+                        y_col = f"{joint}_y"
+                        if pd.notnull(row_donny[x_col]) and pd.notnull(row_donny[y_col]):
+                            coords_donny[joint] = (float(row_donny[x_col]), float(row_donny[y_col]))
+
+                    # Only align if both shoulders are present for both skeletons
+                    if 11 in coords and 12 in coords and 11 in coords_donny and 12 in coords_donny:
+                        # test's chest center and scale
+                        g11 = coords[11]
+                        g12 = coords[12]
+                        g_center = ((g11[0] + g12[0]) / 2, (g11[1] + g12[1]) / 2)
+                        g_shoulder_dist = ((g11[0] - g12[0]) ** 2 + (g11[1] - g12[1]) ** 2) ** 0.5
+
+                        # Donny's chest center and scale (normalized, so scale to image size)
+                        d11 = (coords_donny[11][0] * width, coords_donny[11][1] * height)
+                        d12 = (coords_donny[12][0] * width, coords_donny[12][1] * height)
+                        d_center = ((d11[0] + d12[0]) / 2, (d11[1] + d12[1]) / 2)
+                        d_shoulder_dist = ((d11[0] - d12[0]) ** 2 + (d11[1] - d12[1]) ** 2) ** 0.5
+
+                        # Compute scale and translation
+                        scale = g_shoulder_dist / d_shoulder_dist if d_shoulder_dist > 0 else 1.0
+                        dx = g_center[0] - d_center[0] * scale
+                        dy = g_center[1] - d_center[1] * scale
+
+                        # Transform and draw Donny's skeleton
+                        coords_donny_trans = {}
+                        for joint, (x, y) in coords_donny.items():
+                            x_img = x * width * scale + dx
+                            y_img = y * height * scale + dy
+                            coords_donny_trans[joint] = (int(x_img), int(y_img))
+                        for j1, j2 in POSE_CONNECTIONS:
+                            if j1 in coords_donny_trans and j2 in coords_donny_trans:
+                                cv2.line(frame, coords_donny_trans[j1], coords_donny_trans[j2], (255, 0, 0), 2)
+                        for (x, y) in coords_donny_trans.values():
+                            cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+                    else:
+                        # fallback: draw Donny in original position if alignment not possible
+                        coords_donny_img = {}
+                        for joint, (x, y) in coords_donny.items():
+                            x_img = int(x * width)
+                            y_img = int(y * height)
+                            coords_donny_img[joint] = (x_img, y_img)
+                        for j1, j2 in POSE_CONNECTIONS:
+                            if j1 in coords_donny_img and j2 in coords_donny_img:
+                                cv2.line(frame, coords_donny_img[j1], coords_donny_img[j2], (255, 0, 0), 2)
+                        for (x, y) in coords_donny_img.values():
+                            cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+
+            out.write(frame)
+        out.release()
+        print(f"Saved {out_path}")
+
+    cap.release()
+    print("Overlay stage videos saved to outputcsv/test_stages_overlay/")
+
+    # ----------- PART 4: Generate full wireframe overlay video first, then cut for each stage -----------
+
+    # Add hands to the wireframe
+    ALL_JOINTS = [11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28]
+    POSE_CONNECTIONS = [
+        (11, 13), (13, 15), (15, 17), (17, 19), (19, 21), (21, 15),  # Left arm and hand
+        (12, 14), (14, 16), (16, 18), (18, 20), (20, 22), (22, 16),  # Right arm and hand
+        (23, 25), (25, 27),  # Left leg
+        (24, 26), (26, 28),  # Right leg
+        (11, 12),            # Shoulders
+        (23, 24),            # Hips
+        (11, 23), (12, 24),  # Torso sides
+    ]
+
+    output_path = "Script/outputcsv/test_wireframe_duo_full.mp4"
+    cap = cv2.VideoCapture(video_path)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    test_len = len(test_df)
+    donny_len = len(donny_df)
+
+    frame_indices_by_stage = {stage: [] for stage in stages}
+
+    for idx in range(min(test_len, int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))):
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Draw test skeleton (red)
         coords = {}
-        if idx < len(test_aligned_df):
-            row = test_aligned_df.iloc[idx]
-            for joint in [11,12,13,14,15,16,23,24,25,26,27,28]:
+        if idx < test_len:
+            row = test_df.iloc[idx]
+            for joint in ALL_JOINTS:
                 x_col = f"{joint}_x"
                 y_col = f"{joint}_y"
                 if pd.notnull(row[x_col]) and pd.notnull(row[y_col]):
@@ -262,60 +370,52 @@ def bigasdmaina(locat):
             for (x, y) in coords.values():
                 cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
 
-        # Draw Donny_1 skeleton (blue), using the corresponding stage frame, aligned to Gordon
-        if i < len(donny_indices):
-            donny_idx = donny_indices[i]
-            if donny_idx < len(donny_df):
-                row_donny = donny_df.iloc[donny_idx]
-                coords_donny = {}
-                for joint in [11,12,13,14,15,16,23,24,25,26,27,28]:
-                    x_col = f"{joint}_x"
-                    y_col = f"{joint}_y"
-                    if pd.notnull(row_donny[x_col]) and pd.notnull(row_donny[y_col]):
-                        coords_donny[joint] = (float(row_donny[x_col]), float(row_donny[y_col]))
+        # Draw Donny_1 skeleton (blue), aligned to test
+        if idx < donny_len and idx < test_len:
+            row_donny = donny_df.iloc[idx]
+            coords_donny = {}
+            for joint in ALL_JOINTS:
+                x_col = f"{joint}_x"
+                y_col = f"{joint}_y"
+                if pd.notnull(row_donny[x_col]) and pd.notnull(row_donny[y_col]):
+                    coords_donny[joint] = (float(row_donny[x_col]), float(row_donny[y_col]))
 
-                # Only align if both shoulders are present for both skeletons
-                if 11 in coords and 12 in coords and 11 in coords_donny and 12 in coords_donny:
-                    # Gordon's chest center and scale
-                    g11 = coords[11]
-                    g12 = coords[12]
-                    g_center = ((g11[0] + g12[0]) / 2, (g11[1] + g12[1]) / 2)
-                    g_shoulder_dist = ((g11[0] - g12[0]) ** 2 + (g11[1] - g12[1]) ** 2) ** 0.5
+            if 11 in coords and 12 in coords and 11 in coords_donny and 12 in coords_donny:
+                g11 = coords[11]
+                g12 = coords[12]
+                g_center = ((g11[0] + g12[0]) / 2, (g11[1] + g12[1]) / 2)
+                g_shoulder_dist = ((g11[0] - g12[0]) ** 2 + (g11[1] - g12[1]) ** 2) ** 0.5
 
-                    # Donny's chest center and scale (normalized, so scale to image size)
-                    d11 = (coords_donny[11][0] * width, coords_donny[11][1] * height)
-                    d12 = (coords_donny[12][0] * width, coords_donny[12][1] * height)
-                    d_center = ((d11[0] + d12[0]) / 2, (d11[1] + d12[1]) / 2)
-                    d_shoulder_dist = ((d11[0] - d12[0]) ** 2 + (d11[1] - d12[1]) ** 2) ** 0.5
+                d11 = (coords_donny[11][0] * width, coords_donny[11][1] * height)
+                d12 = (coords_donny[12][0] * width, coords_donny[12][1] * height)
+                d_center = ((d11[0] + d12[0]) / 2, (d11[1] + d12[1]) / 2)
+                d_shoulder_dist = ((d11[0] - d12[0]) ** 2 + (d11[1] - d12[1]) ** 2) ** 0.5
 
-                    # Compute scale and translation
-                    scale = g_shoulder_dist / d_shoulder_dist if d_shoulder_dist > 0 else 1.0
-                    dx = g_center[0] - d_center[0] * scale
-                    dy = g_center[1] - d_center[1] * scale
+                scale = g_shoulder_dist / d_shoulder_dist if d_shoulder_dist > 0 else 1.0
+                dx = g_center[0] - d_center[0] * scale
+                dy = g_center[1] - d_center[1] * scale
 
-                    # Transform and draw Donny's skeleton
-                    coords_donny_trans = {}
-                    for joint, (x, y) in coords_donny.items():
-                        x_img = x * width * scale + dx
-                        y_img = y * height * scale + dy
-                        coords_donny_trans[joint] = (int(x_img), int(y_img))
-                    for j1, j2 in POSE_CONNECTIONS:
-                        if j1 in coords_donny_trans and j2 in coords_donny_trans:
-                            cv2.line(frame, coords_donny_trans[j1], coords_donny_trans[j2], (255, 0, 0), 2)
-                    for (x, y) in coords_donny_trans.values():
-                        cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
-                else:
-                    # fallback: draw Donny in original position if alignment not possible
-                    coords_donny_img = {}
-                    for joint, (x, y) in coords_donny.items():
-                        x_img = int(x * width)
-                        y_img = int(y * height)
-                        coords_donny_img[joint] = (x_img, y_img)
-                    for j1, j2 in POSE_CONNECTIONS:
-                        if j1 in coords_donny_img and j2 in coords_donny_img:
-                            cv2.line(frame, coords_donny_img[j1], coords_donny_img[j2], (255, 0, 0), 2)
-                    for (x, y) in coords_donny_img.values():
-                        cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+                coords_donny_trans = {}
+                for joint, (x, y) in coords_donny.items():
+                    x_img = x * width * scale + dx
+                    y_img = y * height * scale + dy
+                    coords_donny_trans[joint] = (int(x_img), int(y_img))
+                for j1, j2 in POSE_CONNECTIONS:
+                    if j1 in coords_donny_trans and j2 in coords_donny_trans:
+                        cv2.line(frame, coords_donny_trans[j1], coords_donny_trans[j2], (255, 0, 0), 2)
+                for (x, y) in coords_donny_trans.values():
+                    cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+            else:
+                coords_donny_img = {}
+                for joint, (x, y) in coords_donny.items():
+                    x_img = int(x * width)
+                    y_img = int(y * height)
+                    coords_donny_img[joint] = (x_img, y_img)
+                for j1, j2 in POSE_CONNECTIONS:
+                    if j1 in coords_donny_img and j2 in coords_donny_img:
+                        cv2.line(frame, coords_donny_img[j1], coords_donny_img[j2], (255, 0, 0), 2)
+                for (x, y) in coords_donny_img.values():
+                    cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
 
         out.write(frame)
 
@@ -329,7 +429,146 @@ def bigasdmaina(locat):
     print(f"Full wireframe overlay video saved to {output_path}")
     return output_path
 
+    def compare_angles_and_report(donny_angles_csv, test_angles_csv, threshold_degrees=30):
+        import pandas as pd
+        import numpy as np
 
+        donny_df = pd.read_csv(donny_angles_csv)
+        test_df = pd.read_csv(test_angles_csv)
+
+        # Align on frame count (use min length)
+        min_len = min(len(donny_df), len(test_df))
+        donny_df = donny_df.iloc[:min_len]
+        test_df = test_df.iloc[:min_len]
+
+        # Get joint columns (skip timestamp)
+        joint_columns = [col for col in donny_df.columns if col != "timestamp_milis"]
+
+        differences = []
+        for i in range(min_len):
+            for joint in joint_columns:
+                try:
+                    d_angle = float(donny_df.iloc[i][joint])
+                    t_angle = float(test_df.iloc[i][joint])
+                except Exception:
+                    continue
+                if np.isnan(d_angle) or np.isnan(t_angle):
+                    continue
+                diff = abs(d_angle - t_angle)
+                if diff > threshold_degrees:
+                    differences.append({
+                        "frame": i,
+                        "joint": joint,
+                        "donny_angle": d_angle,
+                        "test_angle": t_angle,
+                        "difference": diff,
+                        "donny_time": donny_df.iloc[i].get("timestamp_milis", None),
+                        "test_time": test_df.iloc[i].get("timestamp_milis", None)
+                    })
+
+        # Also check for timing mismatches (if timestamps are available)
+        timing_mismatches = []
+        if "timestamp_milis" in donny_df.columns and "timestamp_milis" in test_df.columns:
+            for i in range(min_len):
+                d_time = donny_df.iloc[i]["timestamp_milis"]
+                t_time = test_df.iloc[i]["timestamp_milis"]
+                if not pd.isna(d_time) and not pd.isna(t_time):
+                    if abs(float(d_time) - float(t_time)) > 100:  # e.g., more than 100 ms difference
+                        timing_mismatches.append({
+                            "frame": i,
+                            "donny_time": d_time,
+                            "test_time": t_time,
+                            "time_difference_ms": abs(float(d_time) - float(t_time))
+                        })
+        values = []
+        # Output results
+        print("\n--- Angle Differences > {} degrees ---".format(threshold_degrees))
+        for diff in differences:
+            print(f"Frame {diff['frame']} | Joint: {diff['joint']} | Donny: {diff['donny_angle']:.2f} | Test: {diff['test_angle']:.2f} | Diff: {diff['difference']:.2f} deg | Donny time: {diff['donny_time']} | Test time: {diff['test_time']}")
+            values.append(f"Frame {diff['frame']} | Joint: {diff['joint']} | Donny: {diff['donny_angle']:.2f} | Test: {diff['test_angle']:.2f} | Diff: {diff['difference']:.2f} deg | Donny time: {diff['donny_time']} | Test time: {diff['test_time']}")
+        print("\n--- Timing Mismatches (>100ms) ---")
+        for tm in timing_mismatches:
+            print(f"Frame {tm['frame']} | Donny time: {tm['donny_time']} | Test time: {tm['test_time']} | Diff: {tm['time_difference_ms']} ms")
+            values.append(f"Frame {tm['frame']} | Donny time: {tm['donny_time']} | Test time: {tm['test_time']} | Diff: {tm['time_difference_ms']} ms")
+        
+        # Optionally, save to CSV
+        pd.DataFrame(differences).to_csv("Script/outputcsv/angle_differences_over_30deg.csv", index=False)
+        pd.DataFrame(timing_mismatches).to_csv("Script/outputcsv/timing_mismatches_over_100ms.csv", index=False)
+        print("\nSaved detailed difference reports to Script/outputcsv/angle_differences_over_30deg.csv and Script/outputcsv/timing_mismatches_over_100ms.csv")
+
+        return values
+    # Example usage:
+    outputtext = compare_angles_and_report(
+        "Script/dataAnalysis\\media\\donny_1_angles.csv",
+        "Script/dataAnalysis\\media\\test_angles.csv",
+        threshold_degrees=30
+    )
+
+    def plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv, output_dir="Script/outputcsv/angle_graphs"):
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import os
+
+        donny_df = pd.read_csv(donny_angles_csv)
+        test_df = pd.read_csv(test_angles_csv)
+
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Get joint columns (skip timestamp)
+        joint_columns = [col for col in donny_df.columns if col != "timestamp_milis"]
+
+        for joint in joint_columns:
+            plt.figure(figsize=(12, 5))
+            plt.plot(donny_df[joint], label="Pro", color="blue")
+            plt.plot(test_df[joint], label="Test", color="red")
+            plt.title(f"{joint} Angle Comparison")
+            plt.xlabel("Frame")
+            plt.ylabel("Angle (degrees)")
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{joint.replace(' ', '_')}_comparison.png"))
+            plt.close()
+        print(f"Saved angle comparison graphs to {output_dir}")
+
+    # Example usage:
+    donny_angles_csv = os.path.join("Script", "dataAnalysis", "media", "donny_1_angles.csv")
+    test_angles_csv = os.path.join("Script", "dataAnalysis", "media", "test_angles.csv")
+
+    # Use these variables everywhere you reference the files:
+    plot_and_save_angle_comparisons(donny_angles_csv, test_angles_csv)
+    outputtext = compare_angles_and_report(donny_angles_csv, test_angles_csv, threshold_degrees=30)
+
+    from google import genai
+
+    client = genai.Client(api_key="AIzaSyC3M6h-GS102ruxezI6dGcLYYLdVM7aXZ0")
+
+    outputtext = "\n".join(outputtext)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash", contents=f'''"Analyze the following stream of biomechanical data. Each line represents a single frame, indicating joint angles for a reference individual ('A Professional') and a 'Test' subject, along with the difference and respective timestamps.
+
+    The data is from a volleyball serve.
+    Your task is to summarize this data concisely and informatively. Focus on identifying significant deviations, general trends, and key observations for each joint group (arms, legs, shoulders). Present the summary in a highly readable format, using bullet points for clarity.
+    You are summarizing this to the test subject, so keep the language clear and direct, avoiding technical jargon where possible. Refer to them as "you" rather than "the tets subject." Remain professional and helpful.
+    Do NOT NOT NOT use the frame number to point out the time of an action, but rather which part of the serving motion it is part of.
+    Offer a couple tips or things to improve on.
+
+    Data to Analyze:
+
+    {outputtext}
+
+    Summary Requirements:
+
+    Provide an overall introductory observation.
+    Group findings by joint (e.g., Left Arm, Right Arm, Left Shoulder, Right Shoulder, Left Leg, Right Leg).
+    For each joint, note:
+    The general magnitude of differences.
+    Whether the 'Test' subject's angle is consistently higher or lower than 'the professional's'.
+    Any notable trends over the frames (e.g., increasing/decreasing difference, specific frames with extreme deviations).
+    Conclude with a high-level summary of the most pronounced differences.
+    Keep the language direct and avoid conversational filler."'''
+    )
+    return response.text
 
 import os
 def bigasdmaina2(filePath):
@@ -396,6 +635,7 @@ def bigmain(filelinnk):
         cv2.destroyAllWindows()
 
     def interpolate_ball_positions(input_csv, output_csv):
+
         # Read the CSV
         df = pd.read_csv(input_csv)
         # Set frame as the index for interpolation
@@ -850,6 +1090,9 @@ def bigaasasdmainasa(videopath):
         angles_df, coords_df = main(video_path)
         all_data[f"{label}_angles"] = angles_df
         all_data[f"{label}_coords"] = coords_df
+        
+        if videopath.split(".")[-1] == "MOV":
+            continue
         # Ball detection/interpolation
         weights_path = r"betteranalysis\best.pt"
         ball_df = detect_ball_yolov8(video_path, weights_path=weights_path)
@@ -862,22 +1105,6 @@ def bigaasasdmainasa(videopath):
         ball_body_df = analyze_ball_and_body_with_time(interp_ball_df, coords_df, width, height)
         all_data[f"{label}_ball_body"] = ball_body_df
 
-    # --- Plot ball-hand distance for both videos ---
-    def plot_ball_hand_distance(test_df, pro_df, label_test="Test", label_pro="Pro"):
-        test_frames = test_df[~test_df['dist_ball_right_wrist'].isna()]['frame']
-        test_dist = test_df[~test_df['dist_ball_right_wrist'].isna()]['dist_ball_right_wrist']
-        pro_frames = pro_df[~pro_df['dist_ball_right_wrist'].isna()]['frame']
-        pro_dist = pro_df[~pro_df['dist_ball_right_wrist'].isna()]['dist_ball_right_wrist']
-        plt.figure(figsize=(12, 6))
-        plt.plot(test_frames, test_dist, label=label_test, color='red')
-        plt.plot(pro_frames, pro_dist, label=label_pro, color='blue')
-        plt.xlabel("Frame")
-        plt.ylabel("Distance (pixels)")
-        plt.title("Distance Between Ball and Right Hand (Wrist) Over Time")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-
     #plot_ball_hand_distance(all_data["test_ball_body"],all_data["good_ball_body"])
 
     # --- Prepare AI prompt data ---
@@ -888,8 +1115,11 @@ def bigaasasdmainasa(videopath):
             return f"First contact at frame {int(first_contact['frame'])}, time {first_contact['time']} ms, dist_ball_right_wrist={first_contact['dist_ball_right_wrist']:.1f}"
         else:
             return "No contact detected."
-
-    test_contact_info = get_ball_contact_summary(all_data["test_ball_body"])
+   
+    if videopath.split("."[-1]) == "MOV":
+        test_contact_info = get_ball_contact_summary(all_data["good_ball_body"])
+    else:
+        test_contact_info = get_ball_contact_summary(all_data["test_ball_body"])
     good_contact_info = get_ball_contact_summary(all_data["good_ball_body"])
 
     # --- Angle comparison and reporting (in-memory) ---
@@ -1019,7 +1249,7 @@ def casc():
     save_path = os.path.join("uploads", video_file.filename)
     video_file.save(save_path)
     
-    image_path= bigmain(save_path)
+    if save_path.split(".")[-1] == "mp4": image_path= bigmain(save_path)
 
     geminiResponse = bigaasasdmainasa(save_path)
     videolin = bigasdmaina2(save_path)  
