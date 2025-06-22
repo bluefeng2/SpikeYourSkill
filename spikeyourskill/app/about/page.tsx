@@ -4,7 +4,7 @@ import TransitionBackground from "../components/TransitionBackground";
 import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-const images = ['/image1.jpg', '/image2.jpg', '/image3.jpg'];
+const images = ['/af.png', '/ag.png', '/ah.png'];
 
 export default function Page() {
   const [current, setCurrent] = useState(1);

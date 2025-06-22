@@ -44,7 +44,7 @@ def makeData(filePath):
     angle_data = []
     coords_data = []
 
-    while cap.isOpened():
+    while cap.isOpened():    
         ret, frame = cap.read()
         if not ret:
             break
@@ -53,6 +53,74 @@ def makeData(filePath):
         results = pose.process(image_rgb)
         row = [cap.get(cv2.CAP_PROP_POS_MSEC)]  # Timestamp in milliseconds
 
+            
+        flip_state = None  # global or outer scope variable
+
+        if results.pose_landmarks:
+            left_shoulder = results.pose_landmarks.landmark[11]
+            right_shoulder = results.pose_landmarks.landmark[12]
+
+            # Decision based on visibility
+            if left_shoulder.visibility < right_shoulder.visibility:
+                flip_state = True
+            elif right_shoulder.visibility < left_shoulder.visibility:
+                flip_state = False
+            else:
+                # Fallback on position
+                flip_state = left_shoulder.x > right_shoulder.x
+                
+            # Get left and right shoulder positions
+            left_shoulder_x = results.pose_landmarks.landmark[11].x
+            right_shoulder_x = results.pose_landmarks.landmark[12].x
+
+            flipped = left_shoulder_x > right_shoulder_x
+            if flipped or flip_state:
+                # Swap relevant joint definitions
+                relevant_joints = [
+                    ("12", "14", "16"),  # Left Arm -> Right Arm
+                    ("11", "13", "15"),  # Right Arm -> Left Arm
+                    ("24", "26", "28"),  # Left Leg -> Right Leg
+                    ("23", "25", "27"),  # Right Leg -> Left Leg
+                    ("14", "12", "24"),  # Left Shoulder -> Right Shoulder
+                    ("13", "11", "23"),  # Right Shoulder -> Left Shoulder
+                    ("12", "24", "11"),  # Chest L -> Chest R
+                    ("11", "23", "12"),  # Chest R -> Chest L
+                ]
+                joint_names = {
+                    ("12", "14", "16"): "Left Arm",
+                    ("11", "13", "15"): "Right Arm",
+                    ("24", "26", "28"): "Left Leg",
+                    ("23", "25", "27"): "Right Leg",
+                    ("14", "12", "24"): "Left Shoulder",
+                    ("13", "11", "23"): "Right Shoulder",
+                    ("12", "24", "11"): "Chest L",
+                    ("11", "23", "12"): "Chest R",
+                }
+            else:
+                # Reset to original
+                relevant_joints = [
+                    ("11", "13", "15"),  # Left Arm
+                    ("12", "14", "16"),  # Right Arm
+                    ("23", "25", "27"),  # Left Leg
+                    ("24", "26", "28"),  # Right Leg
+                    ("13", "11", "23"),  # Left Shoulder
+                    ("14", "12", "24"),  # Right Shoulder
+                    ("11", "23", "12"),  # Chest L
+                    ("12", "24", "11"),  # Chest R
+                ]
+                joint_names = {
+                    ("11", "13", "15"): "Left Arm",
+                    ("12", "14", "16"): "Right Arm",
+                    ("23", "25", "27"): "Left Leg",
+                    ("24", "26", "28"): "Right Leg",
+                    ("13", "11", "23"): "Left Shoulder",
+                    ("14", "12", "24"): "Right Shoulder",
+                    ("11", "23", "12"): "Chest L",
+                    ("12", "24", "11"): "Chest R",
+                }
+        
+
+        
         coords = {}
         coords_row = {'frame': int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1}
         if results.pose_landmarks:
@@ -87,9 +155,9 @@ def makeData(filePath):
         angle_data.append(row)
         coords_data.append(coords_row)
 
-        cv2.imshow('Pose with Angles', frame)
-        if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
-            break
+        #cv2.imshow('Pose with Angles', frame)
+        #if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
+        #    break
 
     cap.release()
     cv2.destroyAllWindows()

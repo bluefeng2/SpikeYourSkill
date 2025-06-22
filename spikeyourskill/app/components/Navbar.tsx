@@ -17,7 +17,7 @@ export default function Navbar() {
         </Link>
         <Link
           href="/analyze"
-          className="px-4 py-2 text-center font-raleway"
+          className="px-4 py-2 text-center font-raleway border border-purple-700 text-purple-700 rounded-lg hover:bg-purple-100 transition"
         >
           Analyze
         </Link>
