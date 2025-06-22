@@ -9,6 +9,9 @@ def main(filePath):
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5)
     cap = cv2.VideoCapture(filePath)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     relevant_joints = [
         ("11", "13", "15"),  # Left Arm (Shoulder-Elbow-Wrist)
@@ -43,6 +46,11 @@ def main(filePath):
 
     angle_data = []
     coords_data = []
+    
+    out_path = f"outputcsv/newVide.mp4"
+    out_path = f"outputcsv/gordon_stages_overlay/gordon_{stage}_overlay.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -87,9 +95,8 @@ def main(filePath):
         angle_data.append(row)
         coords_data.append(coords_row)
 
-        cv2.imshow('Pose with Angles', frame)
-        if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
-            break
+        out.write(frame)  # Write the frame with angles to the output video
+    out.release()
 
     cap.release()
     cv2.destroyAllWindows()

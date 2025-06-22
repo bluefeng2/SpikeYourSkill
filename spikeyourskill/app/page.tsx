@@ -4,7 +4,9 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <TransitionBackground gradient="bg-gradient-to-br from-blue-400 to-white transition-colors duration-700">
+    <TransitionBackground gradient="bg-gradient-to-br from-[#2d014d] to-black transition-colors duration-700">
+      <title>Spike Your Skill</title>
+
       <div className="flex flex-col min-h-screen items-center justify-center">
         <header className="mb-8 flex flex-col items-center">
           <Image
@@ -14,27 +16,27 @@ export default function Home() {
             height={96}
             className="mb-4"
           />
-          <h1 className="font-ubuntu text-4xl font-bold text-blue-700 mb-2">
-            Spike Your Skill
-          </h1>
+            <h1 className="font-ubuntu text-5xl font-bold text-white mb-4 mt-2">
+              Spike Your Skill
+            </h1>
           <p className="font-raleway text-lg text-gray-525 text-center max-w-xl">
             Elevate your volleyball game with AI-powered analytics, video feedback,
             and personalized training tools.
           </p>
         </header>
         <main className="flex flex-col gap-4 w-full max-w-md">
-          <a
+            <a
             href="/analyze"
-            className="bg-blue-600 text-white rounded-lg px-6 py-3 text-center font-semibold hover:bg-blue-700 transition"
-          >
+            className="bg-purple-700 text-white rounded-lg px-6 py-3 text-center font-semibold hover:bg-purple-800 transition"
+            >
             Analyze My Spike
-          </a>
-          <a
+            </a>
+            <a
             href="/about"
-            className="bg-white border border-blue-600 text-blue-600 rounded-lg px-6 py-3 text-center font-semibold hover:bg-blue-50 transition"
-          >
+            className="bg-white border border-[#7c3aed] text-blue-600 rounded-lg px-6 py-3 text-center font-semibold hover:bg-blue-50 transition"
+            >
             Learn More
-          </a>
+            </a>
         </main>
       </div>
     </TransitionBackground>

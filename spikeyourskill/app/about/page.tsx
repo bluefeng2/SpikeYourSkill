@@ -21,7 +21,8 @@ export default function Page() {
     }
   };
   return (
-    <TransitionBackground gradient="bg-gradient-to-br from-blue-900 to-blue-300 transition-colors duration-700">
+    <TransitionBackground gradient="bg-gradient-to-br from-[#2d014d] to-black transition-colors duration-700">
+      <title>Spike Your Skill</title>
       <h1 className="text-white text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-center">About Spike Your Skill</h1>
       <div className="relative w-full max-w-3xl aspect-video mx-auto mb-6">
         <video controls
