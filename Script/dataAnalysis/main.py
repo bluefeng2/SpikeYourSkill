@@ -47,8 +47,7 @@ def main(filePath):
     angle_data = []
     coords_data = []
     
-    out_path = f"outputcsv/newVide.mp4"
-    out_path = f"outputcsv/gordon_stages_overlay/gordon_all_ovealay.mp4"
+    out_path = "newVide.mp4"
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 

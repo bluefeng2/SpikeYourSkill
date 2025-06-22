@@ -109,7 +109,7 @@ def bigasdmaina(locat):
         os.path.join("Script", "dataAnalysis", "media", "donny_1.mp4"),
         os.path.join("Script", "dataAnalysis", "media", "donny_2.mp4"),
         os.path.join("Script", "dataAnalysis", "media", "donny_3.mp4"),
-        os.path.join("Script", "dataAnalysis", "media", "test.mp4")
+        os.path.join("Script", "dataAnalysis", "media", "bad1.mp4")
     ]
     for file in video_files:
         print(f"Processing {file}...")
@@ -221,7 +221,7 @@ def bigasdmaina(locat):
     donny_df = pd.read_csv("Script/dataAnalysis\\media\\donny_1_coords.csv")
 
     # Open the source test video
-    video_path = 'Script/dataAnalysis\\media\\test.mp4'
+    video_path = 'Script/dataAnalysis\\media\\bad1.mp4'
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
