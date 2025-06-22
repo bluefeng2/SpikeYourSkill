@@ -4,7 +4,7 @@ import TransitionBackground from "../components/TransitionBackground";
 import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-const images = ['/af.png', '/ag.png', '/ah.png'];
+const images = ['/af.png', '/ah.png',  '/gor.png'];
 
 export default function Page() {
   const [current, setCurrent] = useState(1);
@@ -51,14 +51,14 @@ export default function Page() {
           {
             current > 0 ? (
           <button onClick={onPrevClick}>
-              <Image src="/left.svg" alt="Left" width={32} height={32} />
+              <Image src="/left.png" alt="Left" width={32} height={32} />
           </button>
           ) : (
             <div style={{width:32, height:32}}/>
           )}
           { current < images.length - 1 ? (
           <button onClick={onNextClick}>
-              <Image src="/right.svg" alt="Right" width={32} height={32} />
+              <Image src="/right.png" alt="Right" width={32} height={32} />
           </button>
           ) : (
             <div style = {{width:32, height:32}}/>
