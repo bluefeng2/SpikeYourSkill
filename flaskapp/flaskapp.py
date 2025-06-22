@@ -179,7 +179,7 @@ def bigasdmaina(locat):
     test_mapping = []
     aligned_test = []
     last_j = 0
-    for j1 in range(len(pro_avg)):
+    for j1 in range(min(len(pro_avg), len(test_array))):
         matches = [j2 for (pj1, j2) in test_path if pj1 == j1]
         if matches:
             test_mapping.append(matches[0])
