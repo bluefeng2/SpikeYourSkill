@@ -219,52 +219,50 @@ def bigmain(filelinnk):
         plt.savefig(os.path.join("m", "timing.png"))
         plt.show()
 
-    if __name__ == "__main__":
-        video_files = [
-            ("donny_1", filelinnk)
-        ]
-        weights_path = r"Script\dataAnalysis\data\best.pt"
-        if os.path.exists(weights_path):
-            print(f"Using YOLOv8 weights from {weights_path}")
+    video_files = [
+        ("donny_1", filelinnk)
+    ]
+    weights_path = r"Script\dataAnalysis\data\best.pt"
+    if os.path.exists(weights_path):
+        print(f"Using YOLOv8 weights from {weights_path}")
 
-        all_distances = {}
-        for label, video_path in video_files:
-            print(f"Processing {label}...")
-            ball_csv = f"{label}_ball_positions.csv"
-            interp_csv = f"{label}_ball_positions_interpolated.csv"
-            wrist_csv = f"{label}_wrist_positions.csv"
+    all_distances = {}
+    for label, video_path in video_files:
+        print(f"Processing {label}...")
+        ball_csv = f"{label}_ball_positions.csv"
+        interp_csv = f"{label}_ball_positions_interpolated.csv"
+        wrist_csv = f"{label}_wrist_positions.csv"
 
-            # Ball detection
-            detect_ball_yolov8(video_path, ball_csv, weights_path=weights_path)
-            interpolate_ball_positions(ball_csv, interp_csv)
-            # Wrist detection
-            extract_wrist_positions(video_path, wrist_csv)
+        # Ball detection
+        detect_ball_yolov8(video_path, ball_csv, weights_path=weights_path)
+        interpolate_ball_positions(ball_csv, interp_csv)
+        # Wrist detection
+        extract_wrist_positions(video_path, wrist_csv)
 
-            # Compute distances
-            ball_df = pd.read_csv(interp_csv).set_index('frame')
-            wrist_df = pd.read_csv(wrist_csv).set_index('frame')
-            wrist_x = wrist_df['right_wrist_x']
-            wrist_y = wrist_df['right_wrist_y']
-            common_frames = ball_df.index.intersection(wrist_df.index)
-            distances = []
-            for frame in common_frames:
-                bx, by = ball_df.loc[frame, ['x', 'y']]
-                wx, wy = wrist_x.loc[frame], wrist_y.loc[frame]
-                if np.isnan([bx, by, wx, wy]).any():
-                    distances.append(np.nan)
-                else:
-                    dist = np.sqrt((bx - wx) ** 2 + (by - wy) ** 2)
-                    distances.append(dist)
-            all_distances[label] = (common_frames, distances)
+        # Compute distances
+        ball_df = pd.read_csv(interp_csv).set_index('frame')
+        wrist_df = pd.read_csv(wrist_csv).set_index('frame')
+        wrist_x = wrist_df['right_wrist_x']
+        wrist_y = wrist_df['right_wrist_y']
+        common_frames = ball_df.index.intersection(wrist_df.index)
+        distances = []
+        for frame in common_frames:
+            bx, by = ball_df.loc[frame, ['x', 'y']]
+            wx, wy = wrist_x.loc[frame], wrist_y.loc[frame]
+            if np.isnan([bx, by, wx, wy]).any():
+                distances.append(np.nan)
+            else:
+                dist = np.sqrt((bx - wx) ** 2 + (by - wy) ** 2)
+                distances.append(dist)
+        all_distances[label] = (common_frames, distances)
 
-        # Plot all on one graph
-        plt.figure(figsize=(12, 6))
-        for label, (frames, distances) in all_distances.items():
-            plt.plot(frames, distances, label=label)
-        plt.xlabel('Frame')
-        plt.ylabel('Distance (pixels)')
-        plt.title('Distance Between Ball Center and Right Wrist (All Videos)')
-        plt.grid(True)
-        plt.legend()
-        plt.show()
-bigmain("videoanalysisonly/bad3.mp4")
+    # Plot all on one graph
+    plt.figure(figsize=(12, 6))
+    for label, (frames, distances) in all_distances.items():
+        plt.plot(frames, distances, label=label)
+    plt.xlabel('Frame')
+    plt.ylabel('Distance (pixels)')
+    plt.title('Distance Between Ball Center and Right Wrist (All Videos)')
+    plt.grid(True)
+    plt.legend()
+    #plt.show()

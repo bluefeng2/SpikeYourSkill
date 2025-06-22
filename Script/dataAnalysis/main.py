@@ -48,7 +48,7 @@ def main(filePath):
     coords_data = []
     
     out_path = f"outputcsv/newVide.mp4"
-    out_path = f"outputcsv/gordon_stages_overlay/gordon_{stage}_overlay.mp4"
+    out_path = f"outputcsv/gordon_stages_overlay/gordon_all_ovealay.mp4"
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
@@ -115,13 +115,13 @@ def main(filePath):
     print(f"Angles saved to {filePath.split('.')[0]}_angles.csv")
     print(f"Coords saved to {filePath.split('.')[0]}_coords.csv")
 
-# Example usage:
-for file in [
-    "dataAnalysis\\media\\donny_1.mp4",
-    "dataAnalysis\\media\\donny_2.mp4",
-    "dataAnalysis\\media\\donny_3.mp4",
-    "dataAnalysis\\media\\gordon.mp4"
-]:
-    print(f"Processing {file}...")
-    main(file)
-    print(f"Finished processing {file}.\n")
+def run(filePath):
+    for file in [
+        "betteranalysis\\good.mp4",
+        filePath
+    ]:
+        print(f"Processing {file}...")
+        main(file)
+        print(f"Finished processing {file}.\n")
+
+run("betteranalysis\\test.mp4")

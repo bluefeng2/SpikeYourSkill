@@ -9,7 +9,7 @@ import matplotlib.cm as cm
 from ultralytics import YOLO
 import mediapipe as mp
 
-def bigMain(videopath):
+def bigaasasdmainasa(videopath):
     # --- Helper: In-memory CSV-like storage ---
     class InMemoryCSV:
         def __init__(self):
@@ -417,4 +417,4 @@ Keep the language direct and avoid conversational filler."'''
     cap.release()
     print(f"Full overlay video with both wireframes synced to video saved to {out_path}")
 
-bigMain("betteranalysis/test.mp4")
+bigasdmainasa("betteranalysis/test.mp4")

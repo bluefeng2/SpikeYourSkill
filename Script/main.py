@@ -1,4 +1,4 @@
-def bigmain(locat):
+def bigasdmaina(locat):
     import os
     import cv2
     import csv
@@ -773,13 +773,13 @@ def bigmain(locat):
     print(response.text)
 
 import os
-def bigMain2(filePath):
+def bigasdmaina2(filePath):
     try: 
         os.remove("Script/dataAnalysis\\media\\test.mp4")
     except:
         pass
     import shutil
     shutil.copyfile(filePath, "Script/dataAnalysis\\media\\test.mp4")
-    bigmain("A")
+    bigasdmaina("A")
     
-bigMain2("betteranalysis/bad1.mp4")
+bigasdmaina2("betteranalysis/bad1.mp4")
