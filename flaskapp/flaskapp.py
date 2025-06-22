@@ -5,7 +5,7 @@ import os
 import zipfile
 import os
 from io import BytesIO
-
+from flask_cors import CORS
 def bigasdmaina(locat):
     import os
     import cv2
@@ -998,6 +998,7 @@ Keep the language direct and avoid conversational filler."'''
 
 
 app = Flask(__name__)
+CORS(app)
 app.config["UPLOAD_FOLDER"] = "uploads"
 
 @app.route('/main', methods=['POST'])
